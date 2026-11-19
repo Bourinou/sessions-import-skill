@@ -25,12 +25,12 @@ function Get-Progress($file) {
     return [double]([DateTimeOffset]$file.LastWriteTimeUtc).ToUnixTimeMilliseconds()
 }
 
-foreach ($root in $roots) {
-    $target = Join-Path $root.FullName "$TargetAccount\$TargetOrg"
-    $sources = Get-ChildItem $root.FullName -Directory | Where-Object { $_.Name -ne $TargetAccount -and $_.Name -ne '_import-backup' } |
+foreach ($dir in $roots) {
+    $target = Join-Path $dir.FullName "$TargetAccount\$TargetOrg"
+    $sources = Get-ChildItem $dir.FullName -Directory | Where-Object { $_.Name -ne $TargetAccount -and $_.Name -ne '_import-backup' } |
         ForEach-Object { Get-ChildItem $_.FullName -Directory } |
         ForEach-Object { Get-ChildItem $_.FullName -File -Filter 'local_*.json' }
-    if (-not $sources) { "[$($root.FullName)] no other account sessions"; continue }
+    if (-not $sources) { "[$($dir.FullName)] no other account sessions"; continue }
 
     # Best copy per session id among the other accounts
     $best = @{}
@@ -39,7 +39,7 @@ foreach ($root in $roots) {
         if (-not $best.ContainsKey($f.Name) -or $p -gt $best[$f.Name].P) { $best[$f.Name] = @{ F = $f; P = $p } }
     }
 
-    $backup = Join-Path $root.FullName "_import-backup\$(Get-Date -Format yyyyMMdd-HHmmss)"
+    $backup = Join-Path $dir.FullName "_import-backup\$(Get-Date -Format yyyyMMdd-HHmmss)"
     $added = 0; $updated = 0; $kept = 0; $skippedCurrent = 0
     if (-not $DryRun) { New-Item -ItemType Directory -Force $target | Out-Null }
 
@@ -60,6 +60,6 @@ foreach ($root in $roots) {
         }
     }
     $mode = if ($DryRun) { 'DRY RUN' } else { 'DONE' }
-    "[$mode] $($root.FullName) -> $TargetAccount/$TargetOrg : added $added, updated $updated (older copies backed up), already up to date $kept, current session skipped $skippedCurrent"
+    "[$mode] $($dir.FullName) -> $TargetAccount/$TargetOrg : added $added, updated $updated (older copies backed up), already up to date $kept, current session skipped $skippedCurrent"
     if ($updated -and -not $DryRun) { "  backup: $backup" }
 }
