@@ -4,15 +4,18 @@ param(
     [string]$TargetAccount = $env:CLAUDE_CODE_ACCOUNT_UUID,
     [string]$TargetOrg = $env:CLAUDE_CODE_ORGANIZATION_UUID,
     [string]$CurrentSession = $env:CLAUDE_CODE_HOST_SESSION_ID,
+    [string]$Root,
     [switch]$DryRun
 )
 $ErrorActionPreference = 'Stop'
 
 if (-not $TargetAccount -or -not $TargetOrg) { throw "Target account/org unknown: pass -TargetAccount and -TargetOrg." }
 
-$roots = @(Get-ChildItem "$env:LOCALAPPDATA\Claude-Data\*\claude-code-sessions" -Directory -ErrorAction SilentlyContinue) +
-         @(Get-Item "$env:APPDATA\Claude\claude-code-sessions" -ErrorAction SilentlyContinue) | Where-Object { $_ }
-if (-not $roots) { throw "No claude-code-sessions folder found." }
+if ($Root) { $roots = @(Get-Item $Root) } else {
+    $roots = @(Get-ChildItem "$env:LOCALAPPDATA\Claude-Data\*\claude-code-sessions" -Directory -ErrorAction SilentlyContinue) +
+             @(Get-Item "$env:APPDATA\Claude\claude-code-sessions" -ErrorAction SilentlyContinue) | Where-Object { $_ }
+}
+if (-not $roots) { throw "No claude-code-sessions folder found: pass -Root DIR." }
 
 function Get-Progress($file) {
     try {
@@ -24,7 +27,7 @@ function Get-Progress($file) {
 
 foreach ($root in $roots) {
     $target = Join-Path $root.FullName "$TargetAccount\$TargetOrg"
-    $sources = Get-ChildItem $root.FullName -Directory | Where-Object { $_.Name -ne $TargetAccount } |
+    $sources = Get-ChildItem $root.FullName -Directory | Where-Object { $_.Name -ne $TargetAccount -and $_.Name -ne '_import-backup' } |
         ForEach-Object { Get-ChildItem $_.FullName -Directory } |
         ForEach-Object { Get-ChildItem $_.FullName -File -Filter 'local_*.json' }
     if (-not $sources) { "[$($root.FullName)] no other account sessions"; continue }
